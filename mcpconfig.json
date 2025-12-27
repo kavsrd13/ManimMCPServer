@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "manim-animation-server": {
+      "command": "python",
+      "args": ["mcp_server.py"],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      },
+      "disabled": false,
+      "alwaysAllow": []
+    }
+  }
+}
