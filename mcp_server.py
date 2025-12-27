@@ -11,7 +11,6 @@ from fastmcp import FastMCP
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
-import imageio_ffmpeg
 
 # Initialize FastMCP server
 mcp = FastMCP("Manim Animation Server")
@@ -56,10 +55,8 @@ class ManimExecutor:
             with open(script_path, 'w', encoding='utf-8') as f:
                 f.write(manim_code)
             
-            # Resolve bundled ffmpeg binary via imageio-ffmpeg
-            ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-
             # Execute Manim via Python module to avoid PATH issues
+            # Manim will handle ffmpeg lookup internally
             cmd = [
                 sys.executable,
                 "-m",
@@ -71,16 +68,12 @@ class ManimExecutor:
                 "GeneratedScene",  # The class name we expect
             ]
 
-            # Ensure Manim sees ffmpeg
-            env = {**os.environ, "FFMPEG_BINARY": ffmpeg_path}
-
             result = subprocess.run(
                 cmd,
                 cwd=str(exec_dir),
                 capture_output=True,
                 text=True,
                 timeout=180,  # 3 minutes timeout
-                env=env,
             )
             
             if result.returncode != 0:
