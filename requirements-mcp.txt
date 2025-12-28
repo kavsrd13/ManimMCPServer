@@ -1,9 +1,10 @@
 
 # MCP Server Requirements
-fastmcp==0.2.0
+# Pin FastMCP to v2 line and ensure Pydantic v2 compatibility
+fastmcp<3
 fastapi==0.111.0
 uvicorn==0.30.6
-pydantic==2.8.2
+pydantic>=2.8,<3
 pycairo>=1.29.0
 manim>=0.19.1
 typing_extensions>=4.9.0
