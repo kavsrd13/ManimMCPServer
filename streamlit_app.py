@@ -27,8 +27,8 @@ if "azure_deployment" not in st.session_state:
 if "azure_api_version" not in st.session_state:
     st.session_state.azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
 
-# Fixed MCP Server Base URL (FastMCP Cloud) - no auth required
-MCP_SERVER_URL = "https://independent-maroon-puffin.fastmcp.app"
+# MCP Server Base URL - Azure Container Apps deployment
+MCP_SERVER_URL = "https://manim-mcp-app.salmonforest-f54e4566.eastus.azurecontainerapps.io"
 
 # Common headers for MCP JSON-RPC and REST calls
 DEFAULT_HEADERS = {
