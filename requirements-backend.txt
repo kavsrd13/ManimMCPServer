@@ -1,0 +1,7 @@
+# Core FastAPI Server Requirements for Azure Container Apps
+fastapi==0.111.0
+uvicorn==0.30.6
+pydantic>=2.8,<3
+pycairo>=1.29.0
+manim>=0.19.1
+typing_extensions>=4.9.0
