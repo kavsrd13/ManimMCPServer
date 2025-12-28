@@ -6,16 +6,16 @@ import base64
 import time
 from pathlib import Path
 from typing import Optional
-from fastmcp import FastMCP
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
 
-# Initialize FastMCP server
-mcp = FastMCP("Manim Animation Server")
-
-# Get FastAPI app instance
-app = mcp.app
+# Create FastAPI app instance
+app = FastAPI(
+    title="Manim Animation Server",
+    description="HTTP API server for generating Manim animations",
+    version="1.0.0"
+)
 
 # Request model for HTTP endpoints
 class ManimCodeRequest(BaseModel):
@@ -150,82 +150,6 @@ class ManimExecutor:
 
 # Global executor instance
 executor = ManimExecutor()
-
-
-@mcp.tool()
-def generate_animation(manim_code: str) -> dict:
-    """
-    Generate a Manim animation from Python code.
-    
-    Args:
-        manim_code: Complete Python code containing a Manim Scene class named 'GeneratedScene'
-        
-    Returns:
-        Dictionary containing:
-        - success (bool): Whether the generation succeeded
-        - video_data (str): Base64-encoded video file (if successful)
-        - execution_time (float): Time taken to generate
-        - error (str): Error message (if failed)
-    """
-    return executor.execute_manim_code(manim_code)
-
-
-@mcp.tool()
-def validate_manim_code(manim_code: str) -> dict:
-    """
-    Validate Manim code syntax without executing it.
-    
-    Args:
-        manim_code: Python code to validate
-        
-    Returns:
-        Dictionary with validation results
-    """
-    try:
-        compile(manim_code, '<string>', 'exec')
-        
-        # Check for required class
-        if 'class GeneratedScene' not in manim_code:
-            return {
-                "valid": False,
-                "error": "Code must contain a class named 'GeneratedScene'"
-            }
-        
-        if 'from manim import' not in manim_code:
-            return {
-                "valid": False,
-                "warning": "Code should import from manim"
-            }
-        
-        return {
-            "valid": True,
-            "message": "Code syntax is valid"
-        }
-    except SyntaxError as e:
-        return {
-            "valid": False,
-            "error": f"Syntax error: {str(e)}"
-        }
-
-
-@mcp.tool()
-def get_server_status() -> dict:
-    """
-    Get the current status of the MCP Manim server.
-    
-    Returns:
-        Server status information
-    """
-    import platform
-    
-    return {
-        "status": "running",
-        "server_name": "Manim Animation Server",
-        "platform": platform.system(),
-        "python_version": platform.python_version(),
-        "temp_directory": str(executor.temp_dir),
-        "available_tools": ["generate_animation", "validate_manim_code", "get_server_status"]
-    }
 
 
 # HTTP Endpoints for FastAPI
