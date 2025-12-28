@@ -1,5 +1,5 @@
 # Streamlit App Requirements - Cloud Deployment
 streamlit==1.31.1
-openai==1.12.0
+openai==1.58.1
 python-dotenv==1.0.1
 requests==2.31.0

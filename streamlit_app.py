@@ -241,8 +241,8 @@ def call_mcp_server(manim_code: str) -> dict:
     return None
 
 def main():
-    st.title("🎬 Manim Animation Generator")
-    st.markdown("### Create mathematical animations from natural language!")
+    st.title("🎬 Visualize Your Imagination")
+    st.markdown("### Create stunning animations from your ideas!")
     
     # Sidebar for Azure credentials
     with st.sidebar:
@@ -368,7 +368,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center'>
-            <p>Powered by Azure OpenAI + FastMCP + Manim</p>
+            <p style='color: #888;'>✨ Bring your ideas to life with AI-powered animations</p>
         </div>
         """,
         unsafe_allow_html=True
