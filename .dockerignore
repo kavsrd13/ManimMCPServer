@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.env
+*.log
+.git/
+.gitignore
+README.md
+streamlit_app.py
+requirements-streamlit.txt
+.vscode/

@@ -12,7 +12,7 @@ load_dotenv()
 
 # Page configuration
 st.set_page_config(
-    page_title="Manim Animation Generator",
+    page_title="See your Imagination come to Life🎬",
     page_icon="🎬",
     layout="wide"
 )

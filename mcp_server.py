@@ -4,26 +4,22 @@ import tempfile
 import subprocess
 import base64
 import time
-import json
 from pathlib import Path
 from typing import Optional
 from fastmcp import FastMCP
-from fastapi import FastAPI, HTTPException
+from fastapi import HTTPException
 from pydantic import BaseModel
 import uvicorn
 
 # Initialize FastMCP server
 mcp = FastMCP("Manim Animation Server")
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Manim Animation Server",
-    description="MCP server for generating Manim animations",
-    version="1.0.0"
-)
+# Get FastAPI app instance
+app = mcp.app
 
-# Request models
+# Request model for HTTP endpoints
 class ManimCodeRequest(BaseModel):
+    """Request model for Manim code validation and generation."""
     manim_code: str
 
 class ManimExecutor:

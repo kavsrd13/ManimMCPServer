@@ -1,9 +1,8 @@
 # MCP Server Requirements (FastMCP Cloud uses this)
-# MCP Server Requirements (FastMCP Cloud uses this)
 fastmcp==0.2.0
 fastapi==0.111.0
 uvicorn==0.30.6
 pydantic==2.8.2
-pycairo==1.26.0
-manim==0.18.1
+pycairo>=1.29.0
+manim>=0.19.1
 typing_extensions>=4.9.0
