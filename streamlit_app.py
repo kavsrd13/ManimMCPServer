@@ -27,99 +27,18 @@ if "azure_deployment" not in st.session_state:
 if "azure_api_version" not in st.session_state:
     st.session_state.azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
 
-# MCP Server Base URL - Azure Container Apps deployment
+# Azure Container Apps server base URL
 MCP_SERVER_URL = "https://manim-mcp-app.salmonforest-f54e4566.eastus.azurecontainerapps.io"
 
-# Common headers for MCP JSON-RPC and REST calls
-DEFAULT_HEADERS = {
-    "Content-Type": "application/json",
-    "Accept": "application/json, text/event-stream",
-}
-
-# Helper: parse possible SSE (Server-Sent Events) or JSON responses
-def parse_mcp_response(response):
-    try:
-        content_type = response.headers.get("Content-Type", "")
-        # Prefer streaming parser for SSE
-        if "text/event-stream" in content_type:
-            result_obj = None
-            for raw_line in response.iter_lines(decode_unicode=True):
-                if not raw_line:
-                    continue
-                line = raw_line.strip()
-                if line.startswith("data:"):
-                    data_str = line[5:].strip()
-                    if not data_str:
-                        continue
-                    try:
-                        obj = json.loads(data_str)
-                        if isinstance(obj, dict):
-                            # JSON-RPC result shape
-                            if "result" in obj and isinstance(obj["result"], dict):
-                                result_obj = obj["result"]
-                            else:
-                                result_obj = obj
-                    except Exception:
-                        continue
-            return result_obj
-        # Fallback: non-streamed SSE payload in body
-        body = response.text or ""
-        if "data:" in body:
-            result_obj = None
-            for line in body.splitlines():
-                l = line.strip()
-                if l.startswith("data:"):
-                    data_str = l[5:].strip()
-                    if not data_str:
-                        continue
-                    try:
-                        obj = json.loads(data_str)
-                        if isinstance(obj, dict):
-                            result_obj = obj.get("result", obj)
-                    except Exception:
-                        continue
-            if result_obj is not None:
-                return result_obj
-        # Otherwise, attempt JSON
-        return response.json()
-    except Exception:
-        return None
-
-# MCP server status check (tries multiple endpoints)
+# Server status check
 @st.cache_data(ttl=60)
-def check_mcp_status() -> bool:
-    endpoints = [
-        f"{MCP_SERVER_URL}/status",
-        f"{MCP_SERVER_URL}/mcp/status",
-        f"{MCP_SERVER_URL}/",
-        f"{MCP_SERVER_URL}/mcp",
-    ]
-    for url in endpoints:
-        try:
-            # First try GET
-            resp = requests.get(url, timeout=10, headers={"Accept": "application/json, text/event-stream"})
-            if resp.status_code == 200:
-                return True
-            # Then try JSON-RPC status via POST when path looks like MCP
-            if url.endswith("/mcp") or url.endswith("/mcp/status"):
-                payload = {
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "tools/call",
-                    "params": {
-                        "name": "get_server_status",
-                        "arguments": {}
-                    }
-                }
-                resp = requests.post(url, json=payload, headers=DEFAULT_HEADERS, timeout=10, stream=True)
-                if resp.status_code == 200:
-                    data = parse_mcp_response(resp)
-                    if isinstance(data, dict):
-                        if "success" in data or "result" in data:
-                            return True
-        except requests.exceptions.RequestException:
-            continue
-    return False
+def check_server_status() -> bool:
+    """Check if the Azure Container Apps server is reachable."""
+    try:
+        resp = requests.get(f"{MCP_SERVER_URL}/status", timeout=10)
+        return resp.status_code == 200
+    except requests.exceptions.RequestException:
+        return False
 
 # Get Azure client with credentials from session state
 @st.cache_resource
@@ -162,83 +81,26 @@ Return ONLY the Python code, no explanations or markdown formatting."""
         return None
 
 def call_mcp_server(manim_code: str) -> dict:
-    """Call the MCP Manim server to generate animation."""
+    """Call the Azure Container Apps Manim server to generate animation."""
     
-    endpoints = [
-        f"{MCP_SERVER_URL}/generate_animation",
-        f"{MCP_SERVER_URL}/mcp/generate_animation",
-        f"{MCP_SERVER_URL}/tools/generate_animation",
-        f"{MCP_SERVER_URL}/mcp/tools/generate_animation",
-        f"{MCP_SERVER_URL}/mcp",
-        f"{MCP_SERVER_URL}/mcp/rpc",
-    ]
-
-    last_exception = None
-    for url in endpoints:
-        try:
-            # Try common payload shapes
-            is_mcp = "/mcp" in url
-            if is_mcp:
-                payloads = [
-                    {
-                        "jsonrpc": "2.0",
-                        "id": 1,
-                        "method": "tools/call",
-                        "params": {
-                            "name": "generate_animation",
-                            "arguments": {"manim_code": manim_code}
-                        }
-                    }
-                ]
-            else:
-                payloads = [
-                    {"manim_code": manim_code},
-                    {"arguments": {"manim_code": manim_code}},
-                    {
-                        "jsonrpc": "2.0",
-                        "id": 1,
-                        "method": "tools/call",
-                        "params": {
-                            "name": "generate_animation",
-                            "arguments": {"manim_code": manim_code}
-                        }
-                    },
-                ]
-            for payload in payloads:
-                # Use JSON-RPC headers when payload includes jsonrpc
-                headers = DEFAULT_HEADERS if ("jsonrpc" in payload or is_mcp) else {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
-                response = requests.post(url, json=payload, headers=headers, timeout=120, stream=True)
-
-                if response.status_code == 200:
-                    data = parse_mcp_response(response)
-                    # Handle direct REST shape
-                    if isinstance(data, dict) and ("success" in data or "video_data" in data or "video_url" in data):
-                        return data
-                    # Handle JSON-RPC shape
-                    if isinstance(data, dict) and "result" in data and isinstance(data["result"], dict):
-                        return data["result"]
-                    # Unknown success shape; return raw
-                    return data
-                elif response.status_code == 404:
-                    # Try next endpoint or payload variant
-                    continue
-                elif response.status_code in (405, 400, 406, 415):
-                    # Method not allowed / bad request -> try next variant
-                    continue
-                else:
-                    # If not 404, surface the error and stop
-                    st.error(f"MCP Server Error ({url}): {response.text}")
-                    return None
-        except requests.exceptions.RequestException as e:
-            last_exception = e
-            # Try next endpoint variant
-            continue
-
-    if last_exception:
-        st.error(f"Error connecting to MCP server: {str(last_exception)}")
-    else:
-        st.error("MCP Server Error: No matching endpoint found.")
-    return None
+    # Direct REST API call to Azure Container Apps
+    url = f"{MCP_SERVER_URL}/generate_animation"
+    
+    try:
+        payload = {"manim_code": manim_code}
+        headers = {"Content-Type": "application/json"}
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=120)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"Server Error ({response.status_code}): {response.text}")
+            return None
+            
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error connecting to server: {str(e)}")
+        return None
 
 def main():
     st.title("🎬 Visualize Your Imagination")
@@ -283,8 +145,8 @@ def main():
         api_configured = bool(st.session_state.azure_api_key and st.session_state.azure_endpoint and st.session_state.azure_deployment)
         
         st.write(f"**Azure OpenAI:** {'✅ Configured' if api_configured else '❌ Not configured'}")
-        mcp_connected = check_mcp_status()
-        st.write(f"**MCP Server:** {'✅ Connected' if mcp_connected else '❌ Not reachable'}")
+        server_connected = check_server_status()
+        st.write(f"**Animation Server:** {'✅ Connected' if server_connected else '❌ Not reachable'}")
         st.markdown(f"*Server: {MCP_SERVER_URL}*")
         
         st.markdown("---")
@@ -356,9 +218,24 @@ def main():
                     if "execution_time" in result:
                         st.info(f"⏱️ Generation time: {result['execution_time']:.2f} seconds")
                 else:
-                    st.error("❌ Failed to generate animation. Check the logs for details.")
+                    st.error("❌ Failed to generate animation")
+                    # Show detailed error information
+                    if result:
+                        if "error" in result:
+                            st.error(f"**Error:** {result['error']}")
+                        if "stderr" in result:
+                            with st.expander("🔍 View Error Details"):
+                                st.code(result.get("stderr", "No stderr available"), language="text")
+                        if "stdout" in result:
+                            with st.expander("📄 View Output"):
+                                st.code(result.get("stdout", "No stdout available"), language="text")
+                    else:
+                        st.error("No response received from the animation server. Please try again.")
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
+            import traceback
+            with st.expander("🔍 View Full Error Trace"):
+                st.code(traceback.format_exc(), language="text")
     
     elif generate_button:
         st.warning("⚠️ Please enter a description for your animation.")
