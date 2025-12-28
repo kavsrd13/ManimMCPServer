@@ -26,6 +26,14 @@ if "azure_deployment" not in st.session_state:
     st.session_state.azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "")
 if "azure_api_version" not in st.session_state:
     st.session_state.azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+if "generated_video" not in st.session_state:
+    st.session_state.generated_video = None
+if "generated_code" not in st.session_state:
+    st.session_state.generated_code = None
+if "last_prompt" not in st.session_state:
+    st.session_state.last_prompt = ""
+if "execution_time" not in st.session_state:
+    st.session_state.execution_time = None
 
 # Azure Container Apps server base URL
 MCP_SERVER_URL = "https://manim-mcp-app.salmonforest-f54e4566.eastus.azurecontainerapps.io"
@@ -165,9 +173,17 @@ def main():
         height=150
     )
     
-    col1, col2 = st.columns([1, 4])
+    col1, col2, col3 = st.columns([2, 1, 3])
     with col1:
         generate_button = st.button("🎨 Generate Animation", type="primary")
+    with col2:
+        if st.session_state.generated_video:
+            if st.button("🗑️ Clear"):
+                st.session_state.generated_video = None
+                st.session_state.generated_code = None
+                st.session_state.last_prompt = ""
+                st.session_state.execution_time = None
+                st.rerun()
     
     # Check if credentials are configured
     if not (st.session_state.azure_api_key and st.session_state.azure_endpoint and st.session_state.azure_deployment):
@@ -188,35 +204,23 @@ def main():
                 manim_code = generate_manim_code(user_input, client)
             
             if manim_code:
-                # Display generated code
-                with st.expander("📝 View Generated Manim Code", expanded=False):
-                    st.code(manim_code, language="python")
-                
-                # Step 2: Generate animation via MCP server
+                # Step 2: Generate animation via server
                 with st.spinner("🎬 Generating animation... This may take a minute..."):
                     result = call_mcp_server(manim_code)
                 
                 if result and result.get("success"):
-                    st.success("✅ Animation generated successfully!")
+                    # Store in session state
+                    st.session_state.generated_code = manim_code
+                    st.session_state.last_prompt = user_input
+                    st.session_state.execution_time = result.get("execution_time")
                     
-                    # Display the video
                     if "video_data" in result:
-                        video_bytes = base64.b64decode(result["video_data"])
-                        st.video(video_bytes)
-                        
-                        # Download button
-                        st.download_button(
-                            label="📥 Download Animation",
-                            data=video_bytes,
-                            file_name=f"manim_animation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
-                            mime="video/mp4"
-                        )
+                        st.session_state.generated_video = base64.b64decode(result["video_data"])
                     elif "video_url" in result:
-                        st.video(result["video_url"])
+                        st.session_state.generated_video = result["video_url"]
                     
-                    # Show execution info
-                    if "execution_time" in result:
-                        st.info(f"⏱️ Generation time: {result['execution_time']:.2f} seconds")
+                    st.success("✅ Animation generated successfully!")
+                    st.rerun()
                 else:
                     st.error("❌ Failed to generate animation")
                     # Show detailed error information
@@ -239,6 +243,38 @@ def main():
     
     elif generate_button:
         st.warning("⚠️ Please enter a description for your animation.")
+    
+    # Display generated video if available
+    if st.session_state.generated_video:
+        st.markdown("---")
+        st.markdown("### 🎬 Generated Animation")
+        
+        if st.session_state.last_prompt:
+            st.info(f"**Prompt:** {st.session_state.last_prompt}")
+        
+        # Display generated code
+        if st.session_state.generated_code:
+            with st.expander("📝 View Generated Manim Code", expanded=False):
+                st.code(st.session_state.generated_code, language="python")
+        
+        # Display the video
+        if isinstance(st.session_state.generated_video, bytes):
+            st.video(st.session_state.generated_video)
+            
+            # Download button
+            st.download_button(
+                label="📥 Download Animation",
+                data=st.session_state.generated_video,
+                file_name=f"manim_animation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
+                mime="video/mp4",
+                key="download_video"
+            )
+        else:
+            st.video(st.session_state.generated_video)
+        
+        # Show execution info
+        if st.session_state.execution_time:
+            st.info(f"⏱️ Generation time: {st.session_state.execution_time:.2f} seconds")
     
     # Footer
     st.markdown("---")
