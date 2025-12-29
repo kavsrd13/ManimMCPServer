@@ -523,11 +523,17 @@ def main():
             st.rerun()
         else:
             error_msg = result.get("error", "Unknown error")
+            stderr_log = result.get("stderr", "")
             st.error(f"❌ Animation generation failed")
             
             # Show detailed error in expander
             with st.expander("🔍 Error Details", expanded=True):
                 st.code(error_msg, language="text")
+                
+                # Show full stderr if available
+                if stderr_log:
+                    st.markdown("**Full Error Log:**")
+                    st.code(stderr_log, language="text")
                 
                 # Show server info
                 if "server_url" in result:
