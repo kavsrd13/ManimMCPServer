@@ -17,6 +17,85 @@ st.set_page_config(
     layout="wide"
 )
 
+# Custom CSS for educational theme
+st.markdown("""
+<style>
+    /* Educational gradient background */
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    /* Main content area */
+    .main .block-container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Title styling */
+    h1 {
+        color: #667eea;
+        text-align: center;
+        font-weight: 700;
+        padding-bottom: 1rem;
+    }
+    
+    /* Subtitle */
+    .subtitle {
+        text-align: center;
+        color: #764ba2;
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+        font-weight: 500;
+    }
+    
+    /* Button styling */
+    .stButton>button {
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* Text area styling */
+    .stTextArea textarea {
+        border-radius: 10px;
+        border: 2px solid #e0e0e0;
+    }
+    
+    .stTextArea textarea:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+    }
+    
+    /* Video container */
+    .stVideo {
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Info boxes */
+    .stInfo {
+        background: linear-gradient(90deg, #e3f2fd 0%, #f3e5f5 100%);
+        border-left: 4px solid #667eea;
+        border-radius: 8px;
+    }
+    
+    /* Success boxes */
+    .stSuccess {
+        background: linear-gradient(90deg, #e8f5e9 0%, #f1f8e9 100%);
+        border-left: 4px solid #4caf50;
+        border-radius: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Initialize session state for credentials
 if "azure_api_key" not in st.session_state:
     st.session_state.azure_api_key = os.getenv("AZURE_OPENAI_API_KEY", "")
@@ -241,45 +320,59 @@ def call_mcp_server(manim_code: str) -> dict:
 
 def main():
     st.title("🎬 Visualize Your Imagination")
+    st.markdown('<p class="subtitle">✨ Transform your ideas into stunning mathematical animations with AI</p>', unsafe_allow_html=True)
     
-    # Sidebar for Azure credentials
+    # Sidebar for Azure credentials - collapsed by default
     with st.sidebar:
-        st.header("🔑 Azure OpenAI Credentials")
+        st.markdown("### 🤖 AI Configuration")
+        st.caption("Enter LLM API credentials here")
         
-        st.session_state.azure_api_key = st.text_input(
-            "Azure API Key",
-            value=st.session_state.azure_api_key,
-            type="password",
-        )
-        
-        st.session_state.azure_endpoint = st.text_input(
-            "Azure Endpoint",
-            value=st.session_state.azure_endpoint,
-        )
-        
-        st.session_state.azure_deployment = st.text_input(
-            "Deployment Name",
-            value=st.session_state.azure_deployment,
-        )
-        
-        st.session_state.azure_api_version = st.text_input(
-            "API Version",
-            value=st.session_state.azure_api_version,
-        )
+        with st.expander("🔑 Azure OpenAI Credentials", expanded=False):
+            st.session_state.azure_api_key = st.text_input(
+                "Azure API Key",
+                value=st.session_state.azure_api_key,
+                type="password",
+            )
+            
+            st.session_state.azure_endpoint = st.text_input(
+                "Azure Endpoint",
+                value=st.session_state.azure_endpoint,
+            )
+            
+            st.session_state.azure_deployment = st.text_input(
+                "Deployment Name",
+                value=st.session_state.azure_deployment,
+            )
+            
+            st.session_state.azure_api_version = st.text_input(
+                "API Version",
+                value=st.session_state.azure_api_version,
+            )
         
         st.markdown("---")
         st.success("✅ AI-Enhanced Generation")
         st.caption("Smart prompts • Better code • Faster results")
+        
+        st.markdown("---")
+        st.markdown("### 💡 Quick Tips")
+        st.markdown("""
+        - Describe animations in simple terms
+        - Mention colors and shapes
+        - Keep it short (5-15 seconds)
+        - Use Unicode for math: ², π, √
+        """)
     
-    # Create two-column layout: video left, input right
+    # Create two-column layout: input left, video right
     left_col, right_col = st.columns([1, 1])
     
-    # Right column: Input and enhanced prompt
-    with right_col:
+    # Left column: Input and enhanced prompt
+    with left_col:
+        st.markdown("### 📝 Your Animation Idea")
         user_input = st.text_area(
-            "Describe the animation you want to create:",
-            placeholder="Example: Create an animation showing a circle transforming into a square, then rotating 360 degrees",
-            height=150
+            "Describe what you want to animate:",
+            placeholder="Example: Show a blue circle morphing into a red square, then rotating 360 degrees with a smooth transition",
+            height=180,
+            label_visibility="collapsed"
         )
         
         # Show enhanced prompt if available
@@ -287,12 +380,12 @@ def main():
             st.markdown("#### ✨ AI-Enhanced Prompt")
             st.info(st.session_state.enhanced_prompt)
         
-        col1, col2 = st.columns([2, 1])
+        col1, col2 = st.columns([3, 1])
         with col1:
-            generate_button = st.button("🎨 Generate Animation", type="primary")
+            generate_button = st.button("🎨 Generate Animation", type="primary", use_container_width=True)
         with col2:
             if st.session_state.generated_video:
-                if st.button("🗑️ Clear"):
+                if st.button("🗑️ Clear", use_container_width=True):
                     st.session_state.generated_video = None
                     st.session_state.generated_code = None
                     st.session_state.last_prompt = ""
@@ -300,10 +393,10 @@ def main():
                     st.session_state.enhanced_prompt = None
                     st.rerun()
     
-    # Left column: Video display
-    with left_col:
+    # Right column: Video display
+    with right_col:
         if st.session_state.generated_video:
-            st.markdown("### 🎬 Generated Animation")
+            st.markdown("### 🎬 Your Animation")
             st.video(st.session_state.generated_video)
             
             st.download_button(
@@ -311,15 +404,27 @@ def main():
                 data=st.session_state.generated_video,
                 file_name=f"manim_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
                 mime="video/mp4",
+                use_container_width=True
             )
             
             if st.session_state.execution_time:
-                st.success(f"⏱️ Execution time: {st.session_state.execution_time}s")
+                st.success(f"⏱️ Generated in {st.session_state.execution_time}s")
             
-            with st.expander("📝 Generated Manim Code"):
+            with st.expander("🐍 View Python Code for Animation"):
                 st.code(st.session_state.generated_code, language="python")
         else:
-            st.info("👈 Enter a prompt and click Generate to see your animation here")
+            st.markdown("### 🎬 Preview")
+            st.info("👈 Enter your animation idea on the left and click Generate to see it come to life here!")
+            
+            # Example placeholder
+            st.markdown("""
+            **Example animations you can create:**
+            - Mathematical visualizations (Pythagorean theorem, derivatives)
+            - Geometric transformations and morphing
+            - Physics simulations (pendulum, waves)
+            - Data visualizations and charts
+            - Educational concept explanations
+            """)
     
     # Check if credentials are configured
     if not (st.session_state.azure_api_key and st.session_state.azure_endpoint and st.session_state.azure_deployment):
@@ -412,7 +517,7 @@ def main():
             st.info("💡 Tips: Try a simpler prompt, or check if the code has syntax errors")
     
     st.markdown("---")
-    st.caption("Powered by Azure Container Apps • Manim Engine • AI-Enhanced")
+    st.markdown('<p style="text-align: center; color: #667eea; font-weight: 500;">⚡ Powered by Azure AI • Manim Engine • Educational Excellence</p>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
