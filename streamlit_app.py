@@ -38,20 +38,24 @@ if "execution_time" not in st.session_state:
 # Detect environment and set appropriate server URL
 def get_server_url():
     """Get the appropriate server URL based on environment."""
-    # Check if running locally (look for common local environment indicators)
-    is_local = (
-        os.getenv("STREAMLIT_RUNTIME_ENV") is None or  # Not in Streamlit Cloud
-        os.path.exists("local_server.py") or  # Local server file exists
-        "localhost" in os.getenv("HOME", "").lower() or
-        "streamlit.app" not in os.getenv("HOSTNAME", "")
+    # Check if running on Streamlit Cloud (production)
+    # Streamlit Cloud sets HOSTNAME with 'streamlit' in it
+    hostname = os.getenv("HOSTNAME", "")
+    home = os.getenv("HOME", "")
+    
+    # If we're on Streamlit Cloud, use production server
+    is_streamlit_cloud = (
+        "streamlit" in hostname.lower() or
+        "/home/appuser" in home or
+        os.getenv("STREAMLIT_RUNTIME_ENV") == "cloud"
     )
     
-    if is_local:
-        # Use local server for development
-        return "http://localhost:8001"
-    else:
+    if is_streamlit_cloud:
         # Use Azure Container Apps for production
         return "https://manim-mcp-app.salmonforest-f54e4566.eastus.azurecontainerapps.io"
+    else:
+        # Use local server for development
+        return "http://localhost:8001"
 
 MCP_SERVER_URL = get_server_url()
 
