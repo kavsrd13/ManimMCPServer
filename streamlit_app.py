@@ -215,7 +215,7 @@ Now convert this user input into a detailed, specific python animation prompt:
 
 def generate_manim_code(enhanced_prompt: str, client) -> str:
     """
-    Second step: Generate Manim code from the enhanced, detailed prompt.
+    Second step: Generate python code from the enhanced, detailed prompt.
     """
 
     system_prompt = """
