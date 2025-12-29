@@ -12,7 +12,7 @@ load_dotenv()
 
 # Page configuration
 st.set_page_config(
-    page_title="See your Imagination come to Life🎬",
+    page_title="Visualize Your Imagination 🎬",
     page_icon="🎬",
     layout="wide"
 )
@@ -35,15 +35,32 @@ if "last_prompt" not in st.session_state:
 if "execution_time" not in st.session_state:
     st.session_state.execution_time = None
 
-# Azure Container Apps server base URL
-MCP_SERVER_URL = "https://manim-mcp-app.salmonforest-f54e4566.eastus.azurecontainerapps.io"
+# Detect environment and set appropriate server URL
+def get_server_url():
+    """Get the appropriate server URL based on environment."""
+    # Check if running locally (look for common local environment indicators)
+    is_local = (
+        os.getenv("STREAMLIT_RUNTIME_ENV") is None or  # Not in Streamlit Cloud
+        os.path.exists("local_server.py") or  # Local server file exists
+        "localhost" in os.getenv("HOME", "").lower() or
+        "streamlit.app" not in os.getenv("HOSTNAME", "")
+    )
+    
+    if is_local:
+        # Use local server for development
+        return "http://localhost:8001"
+    else:
+        # Use Azure Container Apps for production
+        return "https://manim-mcp-app.salmonforest-f54e4566.eastus.azurecontainerapps.io"
+
+MCP_SERVER_URL = get_server_url()
 
 # Server status check
 @st.cache_data(ttl=60)
-def check_server_status() -> bool:
-    """Check if the Azure Container Apps server is reachable."""
+def check_server_status(server_url: str) -> bool:
+    """Check if the animation server is reachable."""
     try:
-        resp = requests.get(f"{MCP_SERVER_URL}/status", timeout=10)
+        resp = requests.get(f"{server_url}/status", timeout=10)
         return resp.status_code == 200
     except requests.exceptions.RequestException:
         return False
@@ -57,36 +74,138 @@ def get_azure_client(api_key, endpoint, api_version):
         azure_endpoint=endpoint
     )
 
-def generate_manim_code(user_prompt: str, client) -> str:
-    """Convert natural language to Manim code using Azure OpenAI."""
+def enhance_user_prompt(user_input: str, client) -> str:
+    """
+    First step: Convert user's casual description into a detailed, 
+    structured prompt optimized for Manim code generation.
+    """
     
-    system_prompt = """You are an expert in Manim (Mathematical Animation Engine).
-Convert the user's natural language description into valid Manim code.
-Your code should:
-- Be a complete, runnable Python class that inherits from Scene
-- Use Manim Community Edition (manim) syntax
-- Include proper imports
-- Have a class named 'GeneratedScene' that inherits from Scene
-- Implement the construct() method
-- Be well-commented and follow best practices
-- Use appropriate animations and timing
+    enhancement_prompt = """
+You are an expert prompt engineer for Manim animations.
 
-Return ONLY the Python code, no explanations or markdown formatting."""
+Your job: Convert the user's casual description into a DETAILED, SPECIFIC prompt for Manim code generation.
+
+IMPORTANT: LaTeX is NOT available. All math must use plain text with Unicode symbols.
+
+Guidelines:
+1. Break down complex ideas into 3-5 simple, sequential steps
+2. Specify colors, sizes, and positions where helpful
+3. Keep animations SHORT (5-15 seconds total)
+4. Use simple shapes and text rather than complex graphics
+5. For math/equations, ALWAYS use Unicode symbols: ×, ÷, ², ³, √, π, ∑, ∫, ≈, ≤, ≥, ∞, α, β, γ, Δ, etc.
+6. NEVER suggest LaTeX, MathTex, or Tex - use Text() only
+7. Describe visual elements clearly (circles, squares, arrows, text)
+8. Avoid overly complex movements or transformations
+9. Be concrete and specific about what should appear on screen
+
+Example:
+User: "gradient descent finding minimum"
+Enhanced: "Create a simple parabola curve in blue. Show a red dot starting at a high point on the curve. Animate the dot moving down the curve in small steps, following the slope downward. Add a text label 'Gradient Descent' at the top. The dot should stop at the bottom (minimum) of the curve. Total duration: 8 seconds."
+
+User: "explain E=mc²"
+Enhanced: "Show the text 'E=mc²' in large font at center using Unicode superscript. Then split it into three parts: 'E' (energy) in yellow on left, '=' in white at center, 'mc²' (mass × speed²) in blue on right. Use arrows to show how mass times speed of light squared equals energy. Duration: 10 seconds."
+
+User: "Pythagorean theorem"
+Enhanced: "Show text 'a² + b² = c²' at top. Draw a right triangle with sides labeled 'a', 'b', and 'c'. Draw squares on each side. Use colors: red square on 'a', blue square on 'b', green square on 'c'. Animate showing that red area + blue area = green area. Duration: 12 seconds."
+
+Now convert this user input into a detailed, specific Manim animation prompt:
+"""
+    
+    try:
+        response = client.chat.completions.create(
+            model=st.session_state.azure_deployment,
+            messages=[
+                {"role": "system", "content": enhancement_prompt},
+                {"role": "user", "content": user_input},
+            ],
+            temperature=0.8,
+            max_tokens=800,
+            timeout=30,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        # If enhancement fails, return original input
+        st.warning(f"⚠️ Prompt enhancement skipped: {str(e)}")
+        return user_input
+
+def generate_manim_code(enhanced_prompt: str, client) -> str:
+    """
+    Second step: Generate Manim code from the enhanced, detailed prompt.
+    """
+
+    system_prompt = """
+You are a Manim code generator. Generate clean, working Python code.
+
+⚠️ CRITICAL: LaTeX is NOT installed. You MUST NOT use MathTex() or Tex() at all.
+
+MANDATORY RULES:
+1. Output ONLY executable Python code (no markdown, no ```python blocks, no explanations)
+2. Always start with: from manim import *
+3. Class must be named: GeneratedScene(Scene)
+4. Use construct(self) method
+5. Keep it SIMPLE - prefer basic shapes and text
+
+FOR TEXT (REQUIRED FOR ALL TEXT/MATH):
+- Use Text("message", font_size=36, color=WHITE) for ALL text
+- Use Unicode symbols for math: ×, ÷, ², ³, √, π, ∑, ∫, ≈, ≤, ≥, ∞
+- Examples: Text("E=mc²"), Text("a² + b² = c²"), Text("∫ f(x)dx")
+- NEVER use MathTex() or Tex() - they will fail without LaTeX
+
+FOR SHAPES:
+- Circle(), Square(), Rectangle(), Line(), Arrow(), Dot(), Polygon()
+- Set color: Circle(color=BLUE, radius=1)
+- Set position: .shift(UP), .move_to(ORIGIN), .next_to(other, RIGHT)
+
+FOR ANIMATIONS:
+- self.play(Write(text)) - for text appearing
+- self.play(Create(shape)) - for shapes appearing
+- self.play(FadeIn(object)) - fade in
+- self.play(FadeOut(object)) - fade out
+- self.play(object.animate.shift(UP)) - move object
+- self.play(Transform(obj1, obj2)) - morph objects
+- self.wait(1) - pause for 1 second
+
+BEST PRACTICES:
+- Define ALL objects before using them in animations
+- Use clear variable names
+- Keep total animation under 15 seconds
+- Break complex ideas into 3-5 simple steps
+- Test each object is created before animating it
+
+GOOD EXAMPLE:
+from manim import *
+
+class GeneratedScene(Scene):
+    def construct(self):
+        # Using Unicode for math
+        title = Text("E=mc²", font_size=48, color=YELLOW)
+        formula = Text("Energy = Mass × Speed²", font_size=36)
+        formula.next_to(title, DOWN)
+        
+        self.play(Write(title))
+        self.wait(0.5)
+        self.play(FadeIn(formula))
+        self.wait(1)
+
+BAD EXAMPLE (DON'T DO THIS):
+- equation = MathTex(r"E=mc^2")  # ❌ FORBIDDEN - LaTeX not installed
+- tex = Tex("Hello")  # ❌ FORBIDDEN - LaTeX not installed
+"""
 
     try:
         response = client.chat.completions.create(
             model=st.session_state.azure_deployment,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": f"Create this animation:\n{enhanced_prompt}"},
             ],
-            temperature=0.7,
-            max_tokens=2000
+            temperature=0.5,
+            max_tokens=2500,
+            timeout=60,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        st.error(f"Error generating Manim code: {str(e)}")
-        return None
+        raise Exception(f"Code generation failed: {str(e)}")
 
 def call_mcp_server(manim_code: str) -> dict:
     """Call the Azure Container Apps Manim server to generate animation."""
@@ -98,73 +217,54 @@ def call_mcp_server(manim_code: str) -> dict:
         payload = {"manim_code": manim_code}
         headers = {"Content-Type": "application/json"}
         
-        response = requests.post(url, json=payload, headers=headers, timeout=120)
+        response = requests.post(url, json=payload, headers=headers, timeout=300)  # 5 minutes
         
         if response.status_code == 200:
             return response.json()
         else:
-            st.error(f"Server Error ({response.status_code}): {response.text}")
-            return None
+            return {
+                "success": False,
+                "error": f"Server error ({response.status_code}): {response.text}"
+            }
             
     except requests.exceptions.RequestException as e:
-        st.error(f"Error connecting to server: {str(e)}")
-        return None
+        return {
+            "success": False,
+            "error": f"Connection error: {str(e)}"
+        }
 
 def main():
     st.title("🎬 Visualize Your Imagination")
-    st.markdown("### Create stunning animations from your ideas!")
+    st.markdown("### 🌐 **PRODUCTION MODE**")
     
     # Sidebar for Azure credentials
     with st.sidebar:
         st.header("🔑 Azure OpenAI Credentials")
-        st.markdown("**Enter your Azure OpenAI API details**")
         
         st.session_state.azure_api_key = st.text_input(
             "Azure API Key",
             value=st.session_state.azure_api_key,
             type="password",
-            help="Your Azure OpenAI API key"
         )
         
         st.session_state.azure_endpoint = st.text_input(
             "Azure Endpoint",
             value=st.session_state.azure_endpoint,
-            placeholder="https://your-resource.openai.azure.com/",
-            help="Your Azure OpenAI endpoint URL"
         )
         
         st.session_state.azure_deployment = st.text_input(
             "Deployment Name",
             value=st.session_state.azure_deployment,
-            placeholder="gpt-4",
-            help="Your model deployment name"
         )
         
         st.session_state.azure_api_version = st.text_input(
             "API Version",
             value=st.session_state.azure_api_version,
-            placeholder="2024-12-01-preview",
-            help="Azure OpenAI API version"
         )
         
         st.markdown("---")
-        
-        # Configuration status
-        api_configured = bool(st.session_state.azure_api_key and st.session_state.azure_endpoint and st.session_state.azure_deployment)
-        
-        st.write(f"**Azure OpenAI:** {'✅ Configured' if api_configured else '❌ Not configured'}")
-        server_connected = check_server_status()
-        st.write(f"**Animation Server:** {'✅ Connected' if server_connected else '❌ Not reachable'}")
-        st.markdown(f"*Server: {MCP_SERVER_URL}*")
-        
-        st.markdown("---")
-        st.header("📚 Examples")
-        st.markdown("""
-        - Create a circle that transforms into a square
-        - Show the Pythagorean theorem with animation
-        - Animate a sine wave transformation
-        - Display mathematical equation solving steps
-        """)
+        st.success("✅ AI-Enhanced Generation")
+        st.caption("Smart prompts • Better code • Faster results")
     
     # Main input area
     user_input = st.text_area(
@@ -191,101 +291,117 @@ def main():
         return
     
     if generate_button and user_input:
+        # Validate Azure credentials
+        if not all([
+            st.session_state.azure_api_key,
+            st.session_state.azure_endpoint,
+            st.session_state.azure_deployment,
+        ]):
+            st.error("❌ Azure OpenAI credentials are incomplete")
+            return
+        
+        # Get Azure client
+        client = get_azure_client(
+            st.session_state.azure_api_key,
+            st.session_state.azure_endpoint,
+            st.session_state.azure_api_version,
+        )
+
+        # Step 1: Enhance the user's prompt
         try:
-            # Initialize Azure client with user credentials
-            client = get_azure_client(
-                st.session_state.azure_api_key,
-                st.session_state.azure_endpoint,
-                st.session_state.azure_api_version
-            )
-            
-            # Step 1: Generate Manim code
-            with st.spinner("🤖 Converting your description to Manim code..."):
-                manim_code = generate_manim_code(user_input, client)
-            
-            if manim_code:
-                # Step 2: Generate animation via server
-                with st.spinner("🎬 Generating animation... This may take a minute..."):
-                    result = call_mcp_server(manim_code)
+            with st.spinner("🔍 Step 1/3: Analyzing and enhancing your prompt..."):
+                enhanced_prompt = enhance_user_prompt(user_input, client)
                 
-                if result and result.get("success"):
-                    # Store in session state
-                    st.session_state.generated_code = manim_code
-                    st.session_state.last_prompt = user_input
-                    st.session_state.execution_time = result.get("execution_time")
-                    
-                    if "video_data" in result:
-                        st.session_state.generated_video = base64.b64decode(result["video_data"])
-                    elif "video_url" in result:
-                        st.session_state.generated_video = result["video_url"]
-                    
-                    st.success("✅ Animation generated successfully!")
-                    st.rerun()
-                else:
-                    st.error("❌ Failed to generate animation")
-                    # Show detailed error information
-                    if result:
-                        if "error" in result:
-                            st.error(f"**Error:** {result['error']}")
-                        if "stderr" in result:
-                            with st.expander("🔍 View Error Details"):
-                                st.code(result.get("stderr", "No stderr available"), language="text")
-                        if "stdout" in result:
-                            with st.expander("📄 View Output"):
-                                st.code(result.get("stdout", "No stdout available"), language="text")
-                    else:
-                        st.error("No response received from the animation server. Please try again.")
+            # Show the enhanced prompt to user
+            with st.expander("✨ Enhanced Prompt (click to see)", expanded=False):
+                st.info(enhanced_prompt)
+                
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
-            import traceback
-            with st.expander("🔍 View Full Error Trace"):
-                st.code(traceback.format_exc(), language="text")
-    
-    elif generate_button:
-        st.warning("⚠️ Please enter a description for your animation.")
+            st.error(f"❌ Failed to enhance prompt: {str(e)}")
+            st.info("💡 Check your Azure OpenAI credentials")
+            return
+
+        # Step 2: Generate Manim code from enhanced prompt
+        try:
+            with st.spinner("🤖 Step 2/3: Generating Manim code..."):
+                manim_code = generate_manim_code(enhanced_prompt, client)
+                
+            # Clean the code if it's wrapped in markdown
+            if "```python" in manim_code:
+                manim_code = manim_code.split("```python")[1].split("```")[0].strip()
+            elif "```" in manim_code:
+                manim_code = manim_code.split("```")[1].split("```")[0].strip()
+                
+        except Exception as e:
+            st.error(f"❌ Failed to generate code: {str(e)}")
+            st.info("💡 Try simplifying your prompt or check your Azure OpenAI credentials")
+            return
+
+        # Step 3: Render the animation
+        with st.spinner("🎬 Step 3/3: Rendering animation (up to 5 minutes for complex scenes)..."):
+            try:
+                result = call_mcp_server(manim_code)
+            except Exception as e:
+                st.error(f"❌ Rendering failed: {str(e)}")
+                st.info("💡 The animation might be too complex or contain errors")
+                with st.expander("📝 Show Generated Code"):
+                    st.code(manim_code, language="python")
+                return
+
+        # Show any warnings
+        if result.get("warnings"):
+            for warning in result["warnings"]:
+                st.warning(f"⚠️ {warning}")
+
+        if result.get("success"):
+            st.session_state.generated_code = manim_code
+            st.session_state.last_prompt = user_input
+            st.session_state.execution_time = result.get("execution_time")
+
+            st.session_state.generated_video = base64.b64decode(
+                result["video_data"]
+            )
+
+            st.success("✅ Animation generated successfully")
+            st.rerun()
+        else:
+            error_msg = result.get("error", "Unknown error")
+            st.error(f"❌ Animation generation failed")
+            
+            # Show detailed error in expander
+            with st.expander("🔍 Error Details", expanded=True):
+                st.code(error_msg, language="text")
+                
+            # Show the generated code for debugging
+            with st.expander("📝 Generated Code (for debugging)"):
+                st.code(manim_code, language="python")
+                
+            st.info("💡 Tips: Try a simpler prompt, or check if the code has syntax errors")
     
     # Display generated video if available
     if st.session_state.generated_video:
         st.markdown("---")
         st.markdown("### 🎬 Generated Animation")
-        
-        if st.session_state.last_prompt:
-            st.info(f"**Prompt:** {st.session_state.last_prompt}")
-        
-        # Display generated code
-        if st.session_state.generated_code:
-            with st.expander("📝 View Generated Manim Code", expanded=False):
-                st.code(st.session_state.generated_code, language="python")
-        
-        # Display the video
-        if isinstance(st.session_state.generated_video, bytes):
-            st.video(st.session_state.generated_video)
-            
-            # Download button
-            st.download_button(
-                label="📥 Download Animation",
-                data=st.session_state.generated_video,
-                file_name=f"manim_animation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
-                mime="video/mp4",
-                key="download_video"
-            )
-        else:
-            st.video(st.session_state.generated_video)
-        
-        # Show execution info
+
+        st.info(f"**Prompt:** {st.session_state.last_prompt}")
+
+        with st.expander("📝 Generated Manim Code"):
+            st.code(st.session_state.generated_code, language="python")
+
+        st.video(st.session_state.generated_video)
+
+        st.download_button(
+            "📥 Download MP4",
+            data=st.session_state.generated_video,
+            file_name=f"manim_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
+            mime="video/mp4",
+        )
+
         if st.session_state.execution_time:
-            st.info(f"⏱️ Generation time: {st.session_state.execution_time:.2f} seconds")
-    
-    # Footer
+            st.success(f"⏱️ Execution time: {st.session_state.execution_time}s")
+
     st.markdown("---")
-    st.markdown(
-        """
-        <div style='text-align: center'>
-            <p style='color: #888;'>✨ Bring your ideas to life with AI-powered animations</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.caption("Azure Container Apps • Production • Scalable")
 
 if __name__ == "__main__":
     main()

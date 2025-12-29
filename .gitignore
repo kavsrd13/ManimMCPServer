@@ -28,3 +28,22 @@ media/
 *.mov
 *.avi
 temp_*/
+
+# Local development files (not for production)
+local_server.py
+streamlit_app_local.py
+test_local_server.py
+run_local.bat
+start_local_server.bat
+LOCAL_SETUP.md
+STREAMLIT_FIX.md
+IMPROVEMENTS.md
+DEPLOYMENT_SUMMARY.md
+USAGE_GUIDE.md
+deploy.ps1
+deploy_acr_build.ps1
+deploy_to_azure.ps1
+test_deployment.ps1
+
+# Virtual environment
+venv/

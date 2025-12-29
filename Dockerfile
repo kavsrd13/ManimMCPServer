@@ -24,7 +24,6 @@ RUN pip install --no-cache-dir -r requirements-backend.txt
 
 # Copy application code
 COPY mcp_server.py .
-COPY mcpconfig.json .
 
 # Expose port for FastAPI
 EXPOSE 8000
