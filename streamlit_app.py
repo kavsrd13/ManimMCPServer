@@ -162,13 +162,13 @@ def get_azure_client(api_key, endpoint, api_version):
 def enhance_user_prompt(user_input: str, client) -> str:
     """
     First step: Convert user's casual description into a detailed, 
-    structured prompt optimized for Manim code generation.
+    structured prompt optimized for python code generation.
     """
     
     enhancement_prompt = """
-You are an expert prompt engineer for Manim animations.
+You are an expert prompt engineer for python animations.
 
-Your job: Convert the user's casual description into a DETAILED, SPECIFIC prompt for Manim code generation.
+Your job: Convert the user's casual description into a DETAILED, SPECIFIC prompt for python code generation.
 
 IMPORTANT: LaTeX is NOT available. All math must use plain text with Unicode symbols.
 
@@ -193,7 +193,7 @@ Enhanced: "Show the text 'E=mc²' in large font at center using Unicode superscr
 User: "Pythagorean theorem"
 Enhanced: "Show text 'a² + b² = c²' at top. Draw a right triangle with sides labeled 'a', 'b', and 'c'. Draw squares on each side. Use colors: red square on 'a', blue square on 'b', green square on 'c'. Animate showing that red area + blue area = green area. Duration: 12 seconds."
 
-Now convert this user input into a detailed, specific Manim animation prompt:
+Now convert this user input into a detailed, specific python animation prompt:
 """
     
     try:
@@ -293,7 +293,7 @@ BAD EXAMPLE (DON'T DO THIS):
         raise Exception(f"Code generation failed: {str(e)}")
 
 def call_mcp_server(manim_code: str) -> dict:
-    """Call the Azure Container Apps Manim server to generate animation."""
+    """Call the Azure Container Apps server to generate animation."""
     
     # Direct REST API call to Azure Container Apps
     url = f"{MCP_SERVER_URL}/generate_animation"
@@ -402,7 +402,7 @@ def main():
             st.download_button(
                 "📥 Download MP4",
                 data=st.session_state.generated_video,
-                file_name=f"manim_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
+                file_name=f"animation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
                 mime="video/mp4",
                 use_container_width=True
             )
@@ -461,7 +461,7 @@ def main():
 
         # Step 2: Generate Manim code from enhanced prompt
         try:
-            with st.spinner("🤖 Step 2/3: Generating Manim code..."):
+            with st.spinner("🤖 Step 2/3: Generating python code..."):
                 manim_code = generate_manim_code(enhanced_prompt, client)
                 
             # Clean the code if it's wrapped in markdown
