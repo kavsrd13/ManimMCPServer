@@ -34,6 +34,8 @@ if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = ""
 if "execution_time" not in st.session_state:
     st.session_state.execution_time = None
+if "enhanced_prompt" not in st.session_state:
+    st.session_state.enhanced_prompt = None
 
 # Detect environment and set appropriate server URL
 def get_server_url():
@@ -239,7 +241,6 @@ def call_mcp_server(manim_code: str) -> dict:
 
 def main():
     st.title("🎬 Visualize Your Imagination")
-    st.markdown("### 🌐 **PRODUCTION MODE**")
     
     # Sidebar for Azure credentials
     with st.sidebar:
@@ -270,24 +271,55 @@ def main():
         st.success("✅ AI-Enhanced Generation")
         st.caption("Smart prompts • Better code • Faster results")
     
-    # Main input area
-    user_input = st.text_area(
-        "Describe the animation you want to create:",
-        placeholder="Example: Create an animation showing a circle transforming into a square, then rotating 360 degrees",
-        height=150
-    )
+    # Create two-column layout: video left, input right
+    left_col, right_col = st.columns([1, 1])
     
-    col1, col2, col3 = st.columns([2, 1, 3])
-    with col1:
-        generate_button = st.button("🎨 Generate Animation", type="primary")
-    with col2:
+    # Right column: Input and enhanced prompt
+    with right_col:
+        user_input = st.text_area(
+            "Describe the animation you want to create:",
+            placeholder="Example: Create an animation showing a circle transforming into a square, then rotating 360 degrees",
+            height=150
+        )
+        
+        # Show enhanced prompt if available
+        if st.session_state.enhanced_prompt:
+            st.markdown("#### ✨ AI-Enhanced Prompt")
+            st.info(st.session_state.enhanced_prompt)
+        
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            generate_button = st.button("🎨 Generate Animation", type="primary")
+        with col2:
+            if st.session_state.generated_video:
+                if st.button("🗑️ Clear"):
+                    st.session_state.generated_video = None
+                    st.session_state.generated_code = None
+                    st.session_state.last_prompt = ""
+                    st.session_state.execution_time = None
+                    st.session_state.enhanced_prompt = None
+                    st.rerun()
+    
+    # Left column: Video display
+    with left_col:
         if st.session_state.generated_video:
-            if st.button("🗑️ Clear"):
-                st.session_state.generated_video = None
-                st.session_state.generated_code = None
-                st.session_state.last_prompt = ""
-                st.session_state.execution_time = None
-                st.rerun()
+            st.markdown("### 🎬 Generated Animation")
+            st.video(st.session_state.generated_video)
+            
+            st.download_button(
+                "📥 Download MP4",
+                data=st.session_state.generated_video,
+                file_name=f"manim_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
+                mime="video/mp4",
+            )
+            
+            if st.session_state.execution_time:
+                st.success(f"⏱️ Execution time: {st.session_state.execution_time}s")
+            
+            with st.expander("📝 Generated Manim Code"):
+                st.code(st.session_state.generated_code, language="python")
+        else:
+            st.info("👈 Enter a prompt and click Generate to see your animation here")
     
     # Check if credentials are configured
     if not (st.session_state.azure_api_key and st.session_state.azure_endpoint and st.session_state.azure_deployment):
@@ -315,10 +347,7 @@ def main():
         try:
             with st.spinner("🔍 Step 1/3: Analyzing and enhancing your prompt..."):
                 enhanced_prompt = enhance_user_prompt(user_input, client)
-                
-            # Show the enhanced prompt to user
-            with st.expander("✨ Enhanced Prompt (click to see)", expanded=False):
-                st.info(enhanced_prompt)
+                st.session_state.enhanced_prompt = enhanced_prompt
                 
         except Exception as e:
             st.error(f"❌ Failed to enhance prompt: {str(e)}")
@@ -382,30 +411,8 @@ def main():
                 
             st.info("💡 Tips: Try a simpler prompt, or check if the code has syntax errors")
     
-    # Display generated video if available
-    if st.session_state.generated_video:
-        st.markdown("---")
-        st.markdown("### 🎬 Generated Animation")
-
-        st.info(f"**Prompt:** {st.session_state.last_prompt}")
-
-        with st.expander("📝 Generated Manim Code"):
-            st.code(st.session_state.generated_code, language="python")
-
-        st.video(st.session_state.generated_video)
-
-        st.download_button(
-            "📥 Download MP4",
-            data=st.session_state.generated_video,
-            file_name=f"manim_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
-            mime="video/mp4",
-        )
-
-        if st.session_state.execution_time:
-            st.success(f"⏱️ Execution time: {st.session_state.execution_time}s")
-
     st.markdown("---")
-    st.caption("Azure Container Apps • Production • Scalable")
+    st.caption("Powered by Azure Container Apps • Manim Engine • AI-Enhanced")
 
 if __name__ == "__main__":
     main()
