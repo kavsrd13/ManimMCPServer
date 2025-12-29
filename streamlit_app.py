@@ -215,7 +215,7 @@ Now convert this user input into a detailed, specific python animation prompt:
 
 def generate_manim_code(enhanced_prompt: str, client) -> str:
     """
-    Second step: Generate python code from the enhanced, detailed prompt.
+    Second step: Generate Manim code from the enhanced, detailed prompt.
     """
 
     system_prompt = """
@@ -305,17 +305,36 @@ def call_mcp_server(manim_code: str) -> dict:
         response = requests.post(url, json=payload, headers=headers, timeout=300)  # 5 minutes
         
         if response.status_code == 200:
-            return response.json()
+            result = response.json()
+            # Add server URL to result for debugging
+            result["server_url"] = MCP_SERVER_URL
+            return result
         else:
+            error_text = response.text[:500]  # Limit error message length
             return {
                 "success": False,
-                "error": f"Server error ({response.status_code}): {response.text}"
+                "error": f"Server error ({response.status_code}): {error_text}",
+                "server_url": MCP_SERVER_URL,
+                "status_code": response.status_code
             }
             
+    except requests.exceptions.Timeout:
+        return {
+            "success": False,
+            "error": "Request timed out after 5 minutes. The animation might be too complex. Try a simpler prompt.",
+            "server_url": MCP_SERVER_URL
+        }
+    except requests.exceptions.ConnectionError as e:
+        return {
+            "success": False,
+            "error": f"Cannot connect to animation server. Please check your internet connection.\nServer: {MCP_SERVER_URL}\nDetails: {str(e)[:200]}",
+            "server_url": MCP_SERVER_URL
+        }
     except requests.exceptions.RequestException as e:
         return {
             "success": False,
-            "error": f"Connection error: {str(e)}"
+            "error": f"Request error: {str(e)[:300]}",
+            "server_url": MCP_SERVER_URL
         }
 
 def main():
@@ -510,11 +529,24 @@ def main():
             with st.expander("🔍 Error Details", expanded=True):
                 st.code(error_msg, language="text")
                 
+                # Show server info
+                if "server_url" in result:
+                    st.caption(f"Server: {result['server_url']}")
+                if "status_code" in result:
+                    st.caption(f"HTTP Status: {result['status_code']}")
+                
             # Show the generated code for debugging
             with st.expander("📝 Generated Code (for debugging)"):
                 st.code(manim_code, language="python")
                 
+            # Show enhanced prompt
+            with st.expander("📋 Enhanced Prompt Used"):
+                st.text(enhanced_prompt)
+                
             st.info("💡 Tips: Try a simpler prompt, or check if the code has syntax errors")
+            
+            # Suggest testing with simple prompt
+            st.warning("🧪 Try this simple test: 'Create a blue circle'", icon="💡")
     
     st.markdown("---")
     st.markdown('<p style="text-align: center; color: #667eea; font-weight: 500;">⚡ Powered by Azure AI • Manim Engine • Educational Excellence</p>', unsafe_allow_html=True)
