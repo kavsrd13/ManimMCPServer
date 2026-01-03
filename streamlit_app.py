@@ -170,15 +170,15 @@ You are an expert prompt engineer for python animations.
 
 Your job: Convert the user's casual description into a DETAILED, SPECIFIC prompt for python code generation.
 
-IMPORTANT: LaTeX is NOT available. All math must use plain text with Unicode symbols.
+IMPORTANT: LaTeX is FULLY SUPPORTED! Use MathTex() and Tex() for beautiful mathematical equations.
 
 Guidelines:
 1. Break down complex ideas into 3-5 simple, sequential steps
 2. Specify colors, sizes, and positions where helpful
 3. Keep animations SHORT (5-15 seconds total)
 4. Use simple shapes and text rather than complex graphics
-5. For math/equations, ALWAYS use Unicode symbols: ×, ÷, ², ³, √, π, ∑, ∫, ≈, ≤, ≥, ∞, α, β, γ, Δ, etc.
-6. NEVER suggest LaTeX, MathTex, or Tex - use Text() only
+5. For math/equations, USE LaTeX notation with MathTex() for professional mathematical rendering
+6. Encourage LaTeX for equations, formulas, and mathematical notation
 7. Describe visual elements clearly (circles, squares, arrows, text)
 8. Avoid overly complex movements or transformations
 9. Be concrete and specific about what should appear on screen
@@ -188,10 +188,10 @@ User: "gradient descent finding minimum"
 Enhanced: "Create a simple parabola curve in blue. Show a red dot starting at a high point on the curve. Animate the dot moving down the curve in small steps, following the slope downward. Add a text label 'Gradient Descent' at the top. The dot should stop at the bottom (minimum) of the curve. Total duration: 8 seconds."
 
 User: "explain E=mc²"
-Enhanced: "Show the text 'E=mc²' in large font at center using Unicode superscript. Then split it into three parts: 'E' (energy) in yellow on left, '=' in white at center, 'mc²' (mass × speed²) in blue on right. Use arrows to show how mass times speed of light squared equals energy. Duration: 10 seconds."
+Enhanced: "Display Einstein's famous equation using MathTex: 'E=mc^2' in large font at center. Then transform it to show the components: 'E' (energy) in yellow on left, '=' in white at center, 'mc^2' (mass times speed of light squared) in blue on right. Use LaTeX for beautiful mathematical rendering. Duration: 10 seconds."
 
 User: "Pythagorean theorem"
-Enhanced: "Show text 'a² + b² = c²' at top. Draw a right triangle with sides labeled 'a', 'b', and 'c'. Draw squares on each side. Use colors: red square on 'a', blue square on 'b', green square on 'c'. Animate showing that red area + blue area = green area. Duration: 12 seconds."
+Enhanced: "Show the equation using MathTex: 'a^2 + b^2 = c^2' at top with proper LaTeX rendering. Draw a right triangle with sides labeled using MathTex. Draw squares on each side. Use colors: red square on 'a', blue square on 'b', green square on 'c'. Animate showing that red area + blue area = green area. Duration: 12 seconds."
 
 Now convert this user input into a detailed, specific python animation prompt:
 """
@@ -221,7 +221,7 @@ def generate_manim_code(enhanced_prompt: str, client) -> str:
     system_prompt = """
 You are a Manim code generator. Generate clean, working Python code.
 
-⚠️ CRITICAL: LaTeX is NOT installed. You MUST NOT use MathTex() or Tex() at all.
+✅ GREAT NEWS: LaTeX is FULLY SUPPORTED! Use MathTex() and Tex() for beautiful math rendering.
 
 MANDATORY RULES:
 1. Output ONLY executable Python code (no markdown, no ```python blocks, no explanations)
@@ -230,11 +230,12 @@ MANDATORY RULES:
 4. Use construct(self) method
 5. Keep it SIMPLE - prefer basic shapes and text
 
-FOR TEXT (REQUIRED FOR ALL TEXT/MATH):
-- Use Text("message", font_size=36, color=WHITE) for ALL text
-- Use Unicode symbols for math: ×, ÷, ², ³, √, π, ∑, ∫, ≈, ≤, ≥, ∞
-- Examples: Text("E=mc²"), Text("a² + b² = c²"), Text("∫ f(x)dx")
-- NEVER use MathTex() or Tex() - they will fail without LaTeX
+FOR MATHEMATICAL TEXT (RECOMMENDED):
+- Use MathTex(r"E=mc^2") for mathematical equations with LaTeX rendering
+- Use Tex(r"Text with $math$ inside") for mixed text and math
+- Use Text("Plain text", font_size=36) for simple non-mathematical text
+- LaTeX examples: MathTex(r"\int_0^\infty e^{-x^2}dx"), MathTex(r"\frac{-b \pm \sqrt{b^2-4ac}}{2a}")
+- PREFER MathTex() and Tex() for any mathematical notation or equations
 
 FOR SHAPES:
 - Circle(), Square(), Rectangle(), Line(), Arrow(), Dot(), Polygon()
@@ -257,14 +258,14 @@ BEST PRACTICES:
 - Break complex ideas into 3-5 simple steps
 - Test each object is created before animating it
 
-GOOD EXAMPLE:
+GOOD EXAMPLE (WITH LaTeX):
 from manim import *
 
 class GeneratedScene(Scene):
     def construct(self):
-        # Using Unicode for math
-        title = Text("E=mc²", font_size=48, color=YELLOW)
-        formula = Text("Energy = Mass × Speed²", font_size=36)
+        # Using LaTeX for beautiful math rendering
+        title = MathTex(r"E=mc^2", font_size=48, color=YELLOW)
+        formula = Tex(r"Energy = Mass $\times$ Speed$^2$", font_size=36)
         formula.next_to(title, DOWN)
         
         self.play(Write(title))
@@ -272,9 +273,9 @@ class GeneratedScene(Scene):
         self.play(FadeIn(formula))
         self.wait(1)
 
-BAD EXAMPLE (DON'T DO THIS):
-- equation = MathTex(r"E=mc^2")  # ❌ FORBIDDEN - LaTeX not installed
-- tex = Tex("Hello")  # ❌ FORBIDDEN - LaTeX not installed
+ALTERNATE EXAMPLE (Simple text):
+- text = Text("Hello World", font_size=48)  # ✓ For plain non-math text
+- equation = MathTex(r"\int_0^\infty e^{-x^2}dx")  # ✓ RECOMMENDED for math equations
 """
 
     try:

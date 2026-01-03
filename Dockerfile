@@ -5,12 +5,19 @@ FROM python:3.11-slim
 
 # Install system dependencies required for compiling pycairo and running Manim
 # These are needed because Linux doesn't have pre-built wheels like Windows does
+# Added LaTeX support for complex mathematical animations
 RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
     libcairo2-dev \
     libpango1.0-dev \
     ffmpeg \
+    texlive-full \
+    texlive-latex-extra \
+    texlive-fonts-extra \
+    texlive-science \
+    dvipng \
+    ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory

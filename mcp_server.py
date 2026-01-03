@@ -29,30 +29,6 @@ class ManimExecutor:
         self.temp_dir = Path(tempfile.gettempdir()) / "manim_mcp"
         self.temp_dir.mkdir(exist_ok=True)
     
-    def sanitize_manim_code(self, manim_code: str) -> str:
-        """Remove LaTeX dependencies and replace with Text()."""
-        replacements = {
-            "Tex(": "Text(",
-            "MathTex(": "Text(",
-            "get_graph_label(": "get_text_label(",
-        }
-
-        for old, new in replacements.items():
-            manim_code = manim_code.replace(old, new)
-
-        if "get_text_label" in manim_code:
-            helper = """
-from manim import Text
-
-def get_text_label(axes, graph, label="Label", x_val=None):
-    txt = Text(label, font_size=28)
-    txt.next_to(graph, UP)
-    return txt
-"""
-            manim_code = helper + "\n" + manim_code
-
-        return manim_code
-    
     def execute_manim_code(self, manim_code: str) -> dict:
         """
         Execute Manim code and return the generated video.
@@ -70,13 +46,10 @@ def get_text_label(axes, graph, label="Label", x_val=None):
         exec_dir.mkdir(exist_ok=True)
         
         try:
-            # Sanitize code to remove LaTeX dependencies
-            safe_code = self.sanitize_manim_code(manim_code)
-            
-            # Write Manim code to file
+            # Write Manim code to file (LaTeX support enabled)
             script_path = exec_dir / "scene.py"
             with open(script_path, 'w', encoding='utf-8') as f:
-                f.write(safe_code)
+                f.write(manim_code)
             
             # Execute Manim via Python module to avoid PATH issues
             # Manim will handle ffmpeg lookup internally
@@ -145,8 +118,8 @@ def get_text_label(axes, graph, label="Label", x_val=None):
                 "execution_time": execution_time,
                 "video_size_bytes": len(video_data),
                 "resolution": "480p",
-                "latex": "disabled",
-                "message": "Animation generated successfully"
+                "latex": "enabled",
+                "message": "Animation generated successfully with LaTeX support"
             }
             
         except subprocess.TimeoutExpired:
@@ -214,25 +187,26 @@ async def http_validate_manim_code(request: ManimCodeRequest):
         compile(request.manim_code, '<string>', 'exec')
         
         warnings = []
-        # Flag LaTeX usage as error since it's not installed
-        if "Tex(" in request.manim_code or "MathTex(" in request.manim_code:
-            return {
-                "valid": False, 
-                "error": "LaTeX not installed. Use Text() with Unicode symbols instead of MathTex() or Tex(). Example: Text('E=mc²') instead of MathTex(r'E=mc^2')"
-            }
         
+        # Check for required class name
         if 'class GeneratedScene' not in request.manim_code:
             return {
                 "valid": False,
                 "error": "Code must contain a class named 'GeneratedScene'"
             }
         
+        # Check for manim import
         if 'from manim import' not in request.manim_code:
             warnings.append("Code should import from manim")
+        
+        # Provide helpful LaTeX tips if LaTeX is used
+        if 'Tex(' in request.manim_code or 'MathTex(' in request.manim_code:
+            warnings.append("LaTeX support enabled - ensure proper LaTeX syntax in Tex() and MathTex() calls")
         
         return {
             "valid": True,
             "warnings": warnings,
+            "latex_enabled": True,
             "message": "Code syntax is valid"
         }
     except SyntaxError as e:
@@ -255,7 +229,7 @@ async def http_get_status():
         "platform": platform.system(),
         "python_version": platform.python_version(),
         "temp_directory": str(executor.temp_dir),
-        "latex": "disabled",
+        "latex": "enabled",
         "available_endpoints": ["/generate_animation", "/validate_manim_code", "/status"]
     }
 
